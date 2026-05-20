@@ -54,3 +54,12 @@ jobs:
           DRY_RUN: ${{ vars.DRY_RUN || 'true' }}
           PYTHONPATH: ${{ github.workspace }}
         run: python -m buildinpublic.run --date "$(date -u +%F)"
+
+      - name: Upload failed thread (for manual re-post)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-thread-${{ github.run_id }}
+          path: buildinpublic/logs/failed-thread-*.json
+          if-no-files-found: ignore
+          retention-days: 30

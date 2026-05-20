@@ -19,6 +19,7 @@ def append_log(
     filter_result: FilterResult,
     *,
     dry_run: bool,
+    error: str | None = None,
 ) -> Path:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     path = LOG_DIR / f"{target_date.isoformat()}.jsonl"
@@ -39,6 +40,7 @@ def append_log(
             if posted
             else None
         ),
+        "error": error,
     }
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")

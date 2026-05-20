@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from datetime import date, datetime, timedelta, timezone
@@ -91,10 +92,31 @@ def main(argv: list[str] | None = None) -> int:
     if dry_run:
         posted = post_thread(thread, dry_run=True)
         print(f"[buildinpublic] DRY-RUN posted preview: {posted.first_url}")
-    else:
-        posted = post_thread(thread, dry_run=False)
-        print(f"[buildinpublic] POSTED: {posted.first_url}")
+        log_path = append_log(target_date, posted, thread, filtered, dry_run=dry_run)
+        print(f"[buildinpublic] log: {log_path}")
+        return 0
 
+    try:
+        posted = post_thread(thread, dry_run=False)
+    except Exception as e:
+        # 投稿失敗時：生成済み thread を保全（手動再投稿可能に） + log に失敗記録 + workflow を red にして取締役会に通知
+        # Case 20 (X API 403) の教訓：thread 生成までは成功するため、失われると同じ集約をやり直す必要が出る
+        err_msg = f"{type(e).__name__}: {e}"
+        print(f"[buildinpublic] POST FAILED: {err_msg}", file=sys.stderr)
+
+        failed_thread_path = Path(__file__).parent / "logs" / f"failed-thread-{target_date.isoformat()}.json"
+        failed_thread_path.parent.mkdir(parents=True, exist_ok=True)
+        with failed_thread_path.open("w", encoding="utf-8") as f:
+            json.dump(
+                {"target_date": target_date.isoformat(), "thread": thread, "error": err_msg},
+                f, ensure_ascii=False, indent=2,
+            )
+        print(f"[buildinpublic] failed thread saved: {failed_thread_path}", file=sys.stderr)
+        append_log(target_date, None, thread, filtered, dry_run=dry_run, error=err_msg)
+        raise
+
+
+    print(f"[buildinpublic] POSTED: {posted.first_url}")
     log_path = append_log(target_date, posted, thread, filtered, dry_run=dry_run)
     print(f"[buildinpublic] log: {log_path}")
     return 0
